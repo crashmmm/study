@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1F4E79">
+  <meta name="description" content="新高考 3+1+2 物化生每日背诵助手 - PWA 离线可用">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="物化生背诵">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>物化生背诵助手</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#f0f6fc', 100: '#dae9f5', 200: '#b8d2eb', 300: '#8bb4dd',
+              400: '#5d8fce', 500: '#3d72bd', 600: '#2e5ba8', 700: '#1F4E79',
+              800: '#1a3f63', 900: '#152f4d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen pb-16">
+
+  <!-- 顶部 header -->
+  <header class="fixed top-0 left-0 right-0 z-40 bg-brand-700 dark:bg-brand-800 text-white shadow-md">
+    <div class="flex items-center justify-between px-4 h-12 max-w-2xl mx-auto">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-lg">📚</span>
+        <h1 class="text-base font-semibold truncate">物化生背诵助手</h1>
+        <a href="#about-mc" onclick="event.preventDefault(); showMcAbout()"
+           class="ml-1 shrink-0 opacity-90 hover:opacity-100 transition-opacity"
+           title="mc定制 · 设计开发">
+          <img src="assets/mc-brand.svg" alt="mc定制" class="h-[18px] w-auto">
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="streak-badge" class="text-xs bg-amber-500/90 px-2 py-0.5 rounded-full font-medium hidden"></button>
+        <button id="theme-toggle" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10" title="切换主题">
+          <span id="theme-icon">🌙</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main id="main-content" class="pt-14 pb-4 px-3 max-w-2xl mx-auto">
+
+    <!-- ========== 今日 Tab ========== -->
+    <section id="tab-today" class="tab-content">
+      <div class="mb-4">
+        <h2 class="text-lg font-bold text-brand-700 dark:text-brand-300 mb-1">📖 今日学习</h2>
+        <p class="text-xs text-slate-500">每日 3 科各 1 节（5★优先），默读 + 自测强化记忆</p>
+      </div>
+
+      <!-- 今日状态卡片 -->
+      <div id="today-stats" class="grid grid-cols-3 gap-2 mb-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-2 text-center shadow-sm">
+          <div class="text-xl font-bold text-emerald-500" id="stat-learned">0</div>
+          <div class="text-xs text-slate-500">已学</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-2 text-center shadow-sm">
+          <div class="text-xl font-bold text-amber-500" id="stat-review">0</div>
+          <div class="text-xs text-slate-500">待复习</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-2 text-center shadow-sm">
+          <div class="text-xl font-bold text-rose-500" id="stat-streak">0</div>
+          <div class="text-xs text-slate-500">连胜(天)</div>
+        </div>
+      </div>
+
+      <!-- 待学习/复习的节 -->
+      <div id="today-list" class="space-y-2">
+        <!-- JS 动态渲染 -->
+      </div>
+    </section>
+
+    <!-- ========== 知识库 Tab ========== -->
+    <section id="tab-library" class="tab-content hidden">
+      <div class="mb-3">
+        <h2 class="text-lg font-bold text-brand-700 dark:text-brand-300 mb-1">🔍 知识库</h2>
+        <p class="text-xs text-slate-500">共 148 节 · 支持搜索/筛选/收藏</p>
+      </div>
+
+      <!-- 搜索框 -->
+      <div class="sticky top-12 z-30 bg-slate-50 dark:bg-slate-900 pt-1 pb-2">
+        <div class="relative">
+          <input id="search-input" type="search" placeholder="搜标题、概念、公式..."
+                 class="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <span class="absolute left-3 top-2.5 text-slate-400">🔍</span>
+        </div>
+
+        <!-- 筛选 -->
+        <div class="flex gap-1 mt-2 text-xs overflow-x-auto pb-1">
+          <button class="filter-btn active px-3 py-1 rounded-full whitespace-nowrap" data-filter="all" data-type="subject">全部</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap" data-filter="物理" data-type="subject">⚛ 物理</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap" data-filter="化学" data-type="subject">⚗ 化学</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap" data-filter="生物" data-type="subject">🧬 生物</button>
+        </div>
+        <div class="flex gap-1 mt-1 text-xs overflow-x-auto pb-1">
+          <button class="filter-btn active px-3 py-1 rounded-full whitespace-nowrap" data-filter="0" data-type="freq">所有频次</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" data-filter="5" data-type="freq">★★★★★ 必考</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" data-filter="4" data-type="freq">★★★★ 高频</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" data-filter="3" data-type="freq">★★★ 常考</button>
+          <button class="filter-btn px-3 py-1 rounded-full whitespace-nowrap bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300" data-filter="2" data-type="freq">★★ 低频</button>
+        </div>
+      </div>
+
+      <!-- 节列表 -->
+      <div id="library-list" class="space-y-2 mt-2">
+        <!-- JS 动态渲染 -->
+      </div>
+    </section>
+
+    <!-- ========== 错题本 Tab ========== -->
+    <section id="tab-errors" class="tab-content hidden">
+      <div class="mb-3 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-brand-700 dark:text-brand-300 mb-1">❌ 错题本</h2>
+          <p class="text-xs text-slate-500">错题会自动收录，可重做巩固</p>
+        </div>
+        <button id="clear-errors" class="text-xs text-rose-500 px-2 py-1">清空</button>
+      </div>
+      <div id="errors-list" class="space-y-2">
+        <!-- JS 动态渲染 -->
+      </div>
+    </section>
+
+    <!-- ========== 日历 Tab ========== -->
+    <section id="tab-calendar" class="tab-content hidden">
+      <div class="mb-3">
+        <h2 class="text-lg font-bold text-brand-700 dark:text-brand-300 mb-1">📅 学习日历</h2>
+        <p class="text-xs text-slate-500">查看每天学了什么，培养每日打卡习惯</p>
+      </div>
+
+      <!-- 月份导航 -->
+      <div class="flex items-center justify-between mb-3">
+        <button id="prev-month" class="w-8 h-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">‹</button>
+        <div id="current-month" class="text-sm font-medium"></div>
+        <button id="next-month" class="w-8 h-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">›</button>
+      </div>
+
+      <!-- 日历网格 -->
+      <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+        <div class="grid grid-cols-7 gap-1 text-xs text-center text-slate-400 mb-2">
+          <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+        </div>
+        <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-sm text-center">
+          <!-- JS 动态渲染 -->
+        </div>
+      </div>
+
+      <!-- 当日详情 -->
+      <div class="mt-4">
+        <h3 id="day-detail-title" class="text-sm font-medium mb-2 text-slate-600 dark:text-slate-400">选择日期查看详情</h3>
+        <div id="day-detail" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- ========== 统计 Tab ========== -->
+    <section id="tab-stats" class="tab-content hidden">
+      <div class="mb-3">
+        <h2 class="text-lg font-bold text-brand-700 dark:text-brand-300 mb-1">📊 学习统计</h2>
+        <p class="text-xs text-slate-500">用数据看见你的进步</p>
+      </div>
+
+      <!-- 总览 -->
+      <div class="grid grid-cols-2 gap-2 mb-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+          <div class="text-xs text-slate-500">总学习节数</div>
+          <div class="text-2xl font-bold text-brand-600" id="stat-total">0</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+          <div class="text-xs text-slate-500">错题总数</div>
+          <div class="text-2xl font-bold text-rose-500" id="stat-errors">0</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+          <div class="text-xs text-slate-500">收藏节数</div>
+          <div class="text-2xl font-bold text-amber-500" id="stat-favorites">0</div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+          <div class="text-xs text-slate-500">最长连胜</div>
+          <div class="text-2xl font-bold text-emerald-500" id="stat-best-streak">0</div>
+        </div>
+      </div>
+
+      <!-- 图表：各科学习进度 -->
+      <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm mb-3">
+        <h3 class="text-sm font-medium mb-2">各科学习进度</h3>
+        <div class="relative h-48">
+          <canvas id="chart-subject"></canvas>
+        </div>
+      </div>
+
+      <!-- 图表：频次分布 -->
+      <div class="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+        <h3 class="text-sm font-medium mb-2">已学节频次分布</h3>
+        <div class="relative h-48">
+          <canvas id="chart-freq"></canvas>
+        </div>
+      </div>
+
+      <!-- 数据管理 -->
+      <div class="mt-4 space-y-2">
+        <button id="export-data" class="w-full py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">📤 导出学习数据（JSON）</button>
+        <label class="block w-full py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center cursor-pointer">
+          📥 导入学习数据
+          <input id="import-data" type="file" accept=".json" class="hidden">
+        </label>
+        <button id="reset-data" class="w-full py-2 text-sm text-rose-500 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-700 rounded-lg">⚠ 重置全部数据</button>
+      </div>
+
+      <!-- mc 定制 版权标识 -->
+      <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-2 text-center">
+        <img src="assets/mc-brand.svg" alt="mc定制" class="h-6 w-auto opacity-90">
+        <p class="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
+          物化生背诵助手 · 由 <span class="text-slate-600 dark:text-slate-300 font-medium">mc定制</span> 设计开发
+        </p>
+        <p class="text-[10px] text-slate-300 dark:text-slate-600">
+          v1.0 · MIT License · 离线可用
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 底部 tab bar -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-lg">
+    <div class="max-w-2xl mx-auto grid grid-cols-5">
+      <button class="tab-btn active flex flex-col items-center py-2" data-tab="today">
+        <span class="text-xl">📖</span>
+        <span class="text-xs mt-0.5">今日</span>
+      </button>
+      <button class="tab-btn flex flex-col items-center py-2" data-tab="library">
+        <span class="text-xl">🔍</span>
+        <span class="text-xs mt-0.5">知识库</span>
+      </button>
+      <button class="tab-btn flex flex-col items-center py-2" data-tab="errors">
+        <span class="text-xl">❌</span>
+        <span class="text-xs mt-0.5">错题</span>
+      </button>
+      <button class="tab-btn flex flex-col items-center py-2" data-tab="calendar">
+        <span class="text-xl">📅</span>
+        <span class="text-xs mt-0.5">日历</span>
+      </button>
+      <button class="tab-btn flex flex-col items-center py-2" data-tab="stats">
+        <span class="text-xl">📊</span>
+        <span class="text-xs mt-0.5">统计</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 节详情/背诵/检测 modal -->
+  <div id="modal" class="hidden fixed inset-0 z-50 bg-black/50 overflow-y-auto">
+    <div id="modal-content" class="bg-slate-50 dark:bg-slate-900 min-h-screen pb-4 max-w-2xl mx-auto">
+      <!-- JS 动态填充 -->
+    </div>
+  </div>
+
+  <!-- 提示 toast -->
+  <div id="toast" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white text-sm px-4 py-2 rounded-lg shadow-lg"></div>
+
+  <!-- 数据 + 逻辑 -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+
+  <!-- 注册 Service Worker（PWA） -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW 注册失败:', err));
+      });
+    }
+  </script>
+</body>
+</html>

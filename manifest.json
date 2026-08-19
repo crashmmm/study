@@ -1,0 +1,44 @@
+{
+  "name": "物化生背诵助手",
+  "short_name": "物化生",
+  "description": "新高考 3+1+2 物化生每日背诵助手",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1F4E79",
+  "theme_color": "#1F4E79",
+  "lang": "zh-CN",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "今日学习",
+      "url": "./#today",
+      "description": "打开今日学习页"
+    },
+    {
+      "name": "知识库",
+      "url": "./#library",
+      "description": "搜索知识点"
+    },
+    {
+      "name": "错题本",
+      "url": "./#errors",
+      "description": "复习错题"
+    }
+  ]
+}
