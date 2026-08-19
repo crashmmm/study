@@ -9,6 +9,7 @@ const DEFAULT_DATA = {
   favorites: [],    // [id, ...]
   theme: 'light',
   dailyCheckin: [], // [YYYY-MM-DD, ...]
+  todayMode: 'freq',// 今日推荐模式：'order' | 'freq' | 'random'
   // 历史：保存所有学习事件用于图表
   history: [],      // [{ id, type: 'learn'|'review'|'quiz', at, correct? }]
 };
@@ -162,14 +163,26 @@ function getTodayList() {
     }
   }
 
-  // 2) 今日新学：三科（物理/化学/生物）各选 1 个最高频次、未学过的节
+  // 2) 今日新学：三科（物理/化学/生物）各选 1 个未学过的节
+  // 选节策略由 data.todayMode 决定：'order' 顺序 / 'freq' 频次优先（默认）/ 'random' 随机
+  const mode = data.todayMode || 'freq';
   for (const sub of ['物理', '化学', '生物']) {
-    const candidate = SECTIONS
-      .filter(s => s.subject === sub && (!data.learned[s.id] || data.learned[s.id].learnedAt !== t))
-      .sort((a, b) => b.frequency - a.frequency)[0];
-    if (candidate) {
-      list.push({ id: candidate.id, type: 'learn', priority: candidate.frequency });
+    const pool = SECTIONS
+      .filter(s => s.subject === sub && (!data.learned[s.id] || data.learned[s.id].learnedAt !== t));
+    if (pool.length === 0) continue;
+
+    let candidate = null;
+    if (mode === 'order') {
+      // 顺序模式：选 num 最小的（适合新生从头学）
+      candidate = [...pool].sort((a, b) => a.num - b.num)[0];
+    } else if (mode === 'random') {
+      // 随机模式：每天 3 节，跨天会变
+      candidate = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+      // freq 模式：按频次降序（5★优先），同频次按 num 升序
+      candidate = [...pool].sort((a, b) => (b.frequency - a.frequency) || (a.num - b.num))[0];
     }
+    list.push({ id: candidate.id, type: 'learn', priority: candidate.frequency });
   }
 
   return list;
@@ -207,6 +220,15 @@ function renderToday() {
   // 拆分：今日新学（每科 1 个）+ 待复习
   const newLearnItems = list.filter(x => x.type === 'learn');
   const reviewItems = list.filter(x => x.type === 'review');
+
+  // 渲染模式选择器（顺序 / 频次 / 随机）
+  const modeSel = document.getElementById('today-mode');
+  if (modeSel) {
+    const cur = data.todayMode || 'freq';
+    modeSel.querySelectorAll('button[data-mode]').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === cur);
+    });
+  }
 
   const container = document.getElementById('today-list');
   if (newLearnItems.length === 0 && reviewItems.length === 0) {
@@ -757,8 +779,13 @@ function renderLibrary() {
       return haystack.includes(kw);
     });
   }
-  // 排序：频次降序
-  list = list.sort((a, b) => b.frequency - a.frequency || a.num - b.num);
+  // 排序：物理→化学→生物，学科内按 num 升序（章节顺序）
+  const SUBJECT_ORDER = { '物理': 0, '化学': 1, '生物': 2 };
+  list = list.sort((a, b) => {
+    const sa = SUBJECT_ORDER[a.subject] ?? 99;
+    const sb = SUBJECT_ORDER[b.subject] ?? 99;
+    return sa - sb || a.num - b.num;
+  });
 
   const container = document.getElementById('library-list');
   if (list.length === 0) {
@@ -828,6 +855,9 @@ function renderErrors() {
 
   container.innerHTML = sorted.map(({ sec, errs, count }) => {
     const lastErr = errs[errs.length - 1];
+    const lastErrText = (lastErr && typeof lastErr === 'object' && lastErr.userAnswer)
+      ? `最近错答：${lastErr.userAnswer}（正确答案见检测）`
+      : `最近做错 ${count} 次（点开重做）`;
     return `
     <div class="section-card" data-id="${sec.id}">
       <div class="flex items-start justify-between gap-2">
@@ -839,7 +869,7 @@ function renderErrors() {
             <span class="text-xs text-rose-500">×${count}</span>
           </div>
           <div class="text-sm font-medium">${sec.title}</div>
-          <div class="text-xs text-slate-400 mt-1">最近错答：${lastErr.userAnswer}（正确答案见检测）</div>
+          <div class="text-xs text-slate-400 mt-1">${lastErrText}</div>
         </div>
         <span class="text-slate-400 self-center">›</span>
       </div>
@@ -1063,6 +1093,19 @@ document.getElementById('reset-data').addEventListener('click', () => {
 
 // =============== 启动 ===============
 initTheme();
+
+// 今日推荐模式切换
+document.querySelectorAll('#today-mode button[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const m = btn.dataset.mode;
+    if (data.todayMode === m) return;
+    data.todayMode = m;
+    saveData();
+    renderToday();
+    // 滚动到今日列表顶部
+    document.getElementById('today-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
 
 // 默认 tab
 const initialTab = (location.hash || '#today').slice(1);
