@@ -1,5 +1,5 @@
 // Service Worker - 物化生背诵助手
-const CACHE_NAME = 'study-app-v2';
+const CACHE_NAME = 'study-app-v3';
 const ASSETS = [
   './',
   './index.html',
